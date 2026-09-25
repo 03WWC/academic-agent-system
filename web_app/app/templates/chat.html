@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>教务多 Agent 学生服务系统</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .chat-container {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .chat-area {
+            flex: 3;
+            display: flex;
+            flex-direction: column;
+            height: 80vh;
+        }
+        
+        .operation-log {
+            flex: 2;
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow-y: auto;
+        }
+        
+        .message-input {
+            display: flex;
+            gap: 10px;
+        }
+        
+        #user-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        #send-btn {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        #send-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .user-message {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            text-align: right;
+        }
+        
+        .ai-message {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            white-space: pre-wrap;
+        }
+        
+        .pending-action-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        
+        .modal-content {
+            background: white;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 50%;
+            max-width: 500px;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        
+        .approve-btn {
+            padding: 10px 20px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .reject-btn {
+            padding: 10px 20px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .log-entry {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            font-size: 12px;
+        }
+        
+        .log-entry:hover {
+            background: #f9f9f9;
+        }
+        
+        .log-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .log-content {
+            color: #666;
+            white-space: pre-wrap;
+        }
+        
+        .log-timestamp {
+            color: #999;
+            font-size: 10px;
+            float: right;
+        }
+        
+        .tool-call {
+            border-left: 3px solid #007bff;
+        }
+        
+        .ai-response {
+            border-left: 3px solid #28a745;
+        }
+        
+        .user-input {
+            border-left: 3px solid #ffc107;
+        }
+        
+        .system-message {
+            border-left: 3px solid #6c757d;
+        }
+        
+        .error {
+            border-left: 3px solid #dc3545;
+        }
+        
+        .tool-result {
+            border-left: 3px solid #17a2b8;
+        }
+        
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .clear-log-btn {
+            padding: 5px 10px;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 10px;
+        }
+        
+        .spinner {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #007bff;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <h1>教务多 Agent 学生服务系统</h1>
+    
+    <div class="chat-container">
+        <div class="chat-area">
+            <div id="chat-messages" class="chat-messages">
+                {% for message in chat_history %}
+                <div class="user-message">
+                    <strong>你：</strong> {{ message.user_message }}
+                </div>
+                <div class="ai-message">
+                    <strong>助手：</strong> {{ message.ai_response }}
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div class="loading" id="loading-indicator">
+                <div class="spinner"></div>
+                正在处理你的请求...
+            </div>
+            
+            <div class="message-input">
+                <input type="text" id="user-input" placeholder="请输入你的问题..." />
+                <button id="send-btn">发送</button>
+            </div>
+        </div>
+        
+        <div class="operation-log">
+            <div class="log-header">
+                <h3>操作日志</h3>
+                <button class="clear-log-btn" onclick="clearOperationLog()">刷新日志</button>
+            </div>
+            <div id="operation-log-content"></div>
+        </div>
+    </div>
+    
+    <div id="pending-action-modal" class="pending-action-modal">
+        <div class="modal-content">
+            <h3>敏感操作需要确认</h3>
+            <div id="pending-action-details"></div>
+            <div class="modal-buttons">
+                <button class="approve-btn" onclick="approveAction()">批准</button>
+                <button class="reject-btn" onclick="rejectAction()">拒绝</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 获取页面元素
+        const chatMessages = document.getElementById('chat-messages');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const pendingActionModal = document.getElementById('pending-action-modal');
+        const pendingActionDetails = document.getElementById('pending-action-details');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const operationLogContent = document.getElementById('operation-log-content');
+        
+        // 添加一条聊天消息，返回内容容器方便流式追加
+        function addMessage(sender, message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = sender === 'user' ? 'user-message' : 'ai-message';
+
+            const label = document.createElement('strong');
+            label.textContent = sender === 'user' ? '你：' : '助手：';
+
+            const contentSpan = document.createElement('span');
+            contentSpan.textContent = message;
+
+            messageDiv.appendChild(label);
+            messageDiv.appendChild(contentSpan);
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            return contentSpan;
+        }
+
+        // 读取后端 NDJSON 流，每行都是一个 {type, content} 事件
+        async function readChatStream(response, assistantContent) {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let finalMessage = '';
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+
+                    const event = JSON.parse(line);
+                    if (event.type === 'token') {
+                        assistantContent.textContent += event.content;
+                    } else if (event.type === 'final') {
+                        finalMessage = event.content;
+                    } else if (event.type === 'error') {
+                        assistantContent.textContent += event.content;
+                    }
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
+            }
+
+            if (buffer.trim()) {
+                const event = JSON.parse(buffer);
+                if (event.type === 'final') {
+                    finalMessage = event.content;
+                }
+            }
+
+            return finalMessage || assistantContent.textContent;
+        }
+
+        // 发送消息并流式展示 Assistant 回复
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            // 请求期间禁用输入框，避免同一个会话并发写入图状态
+            userInput.disabled = true;
+            sendBtn.disabled = true;
+            loadingIndicator.style.display = 'block';
+            
+            try {
+                addMessage('user', message);
+                userInput.value = '';
+                const assistantContent = addMessage('assistant', '');
+
+                const response = await fetch('/chat/stream', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message: message })
+                });
+
+                if (!response.ok || !response.body) {
+                    assistantContent.textContent = '处理请求时出现异常，请稍后再试。';
+                    return;
+                }
+
+                await readChatStream(response, assistantContent);
+            } catch (error) {
+                addMessage('assistant', '处理请求时出现异常，请稍后再试。');
+                console.error('Error:', error);
+            } finally {
+                // 流结束后恢复输入
+                userInput.disabled = false;
+                sendBtn.disabled = false;
+                loadingIndicator.style.display = 'none';
+                userInput.focus();
+            }
+        }
+        
+        // 检查是否有待用户确认的敏感操作
+        async function checkPendingAction() {
+            try {
+                const response = await fetch('/pending-action');
+                const data = await response.json();
+                
+                if (data.pending_action) {
+                    // 展示待审批工具调用详情
+                    let detailsHTML = '<h4>工具调用：</h4><ul>';
+                    data.pending_action.tool_calls.forEach(toolCall => {
+                        detailsHTML += `<li><strong>${toolCall.name}</strong>: ${JSON.stringify(toolCall.args)}</li>`;
+                    });
+                    detailsHTML += '</ul>';
+                    pendingActionDetails.innerHTML = detailsHTML;
+                    pendingActionModal.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('检查待审批操作失败：', error);
+            }
+        }
+
+        // 批准敏感操作
+        async function approveAction() {
+            try {
+                const response = await fetch('/approve-action', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ decision: 'approve' })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    addMessage('assistant', `错误：${data.error}`);
+                } else {
+                    addMessage('assistant', data.response);
+                }
+                
+                // 关闭审批弹窗
+                pendingActionModal.style.display = 'none';
+            } catch (error) {
+                console.error('批准操作失败：', error);
+                addMessage('assistant', '处理批准操作时出现异常。');
+            }
+        }
+
+        // 拒绝敏感操作
+        async function rejectAction() {
+            try {
+                const response = await fetch('/reject-action', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ decision: 'reject' })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    addMessage('assistant', `错误：${data.error}`);
+                } else {
+                    addMessage('assistant', data.response);
+                }
+                
+                // 关闭审批弹窗
+                pendingActionModal.style.display = 'none';
+            } catch (error) {
+                console.error('拒绝操作失败：', error);
+                addMessage('assistant', '处理拒绝操作时出现异常。');
+            }
+        }
+
+        // 拉取并展示操作日志
+        async function fetchOperationLog() {
+            try {
+                const response = await fetch('/operation-log');
+                const data = await response.json();
+                
+                if (data.error) {
+                    operationLogContent.innerHTML = `<div class="log-entry error">错误：${data.error}</div>`;
+                } else {
+                    displayOperationLog(data.operation_log);
+                }
+            } catch (error) {
+                console.error('获取操作日志失败：', error);
+                operationLogContent.innerHTML = '<div class="log-entry error">获取操作日志失败</div>';
+            }
+        }
+
+        // 渲染操作日志列表
+        function displayOperationLog(logEntries) {
+            if (!logEntries || logEntries.length === 0) {
+                operationLogContent.innerHTML = '<div class="log-entry">暂无操作日志</div>';
+                return;
+            }
+            
+            let logHTML = '';
+            logEntries.forEach(entry => {
+                const timestamp = new Date(entry.timestamp).toLocaleTimeString();
+                logHTML += `
+                    <div class="log-entry ${entry.type}">
+                        <div class="log-title">${entry.title}</div>
+                        <div class="log-content">${entry.content}</div>
+                        <div class="log-timestamp">${timestamp}</div>
+                    </div>
+                `;
+            });
+            
+            operationLogContent.innerHTML = logHTML;
+        }
+        
+        // 当前项目没有清空接口，这里先作为刷新日志使用
+        async function clearOperationLog() {
+            fetchOperationLog();
+        }
+
+        // 绑定发送事件
+        sendBtn.addEventListener('click', sendMessage);
+        
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        // 每 5 秒检查一次待审批操作
+        let pendingActionRetryCount = 0;
+        const maxPendingActionRetries = 3;
+        
+        async function checkPendingActionWithRetry() {
+            try {
+                await checkPendingAction();
+                pendingActionRetryCount = 0; // 成功后重置重试次数
+            } catch (error) {
+                pendingActionRetryCount++;
+                console.error(`检查待审批操作失败（第 ${pendingActionRetryCount} 次）：`, error);
+                
+                if (pendingActionRetryCount >= maxPendingActionRetries) {
+                    console.error('检查待审批操作达到最大重试次数');
+                    pendingActionRetryCount = 0; // 重置重试次数
+                }
+            }
+        }
+        
+        // 每 10 秒刷新一次操作日志
+        let operationLogRetryCount = 0;
+        const maxOperationLogRetries = 3;
+        
+        async function fetchOperationLogWithRetry() {
+            try {
+                await fetchOperationLog();
+                operationLogRetryCount = 0; // 成功后重置重试次数
+            } catch (error) {
+                operationLogRetryCount++;
+                console.error(`获取操作日志失败（第 ${operationLogRetryCount} 次）：`, error);
+                
+                if (operationLogRetryCount >= maxOperationLogRetries) {
+                    console.error('获取操作日志达到最大重试次数');
+                    operationLogRetryCount = 0; // 重置重试次数
+                }
+            }
+        }
+        
+        setInterval(checkPendingActionWithRetry, 5000);
+        setInterval(fetchOperationLogWithRetry, 10000);
+        
+        // 页面加载后先拉取一次操作日志
+        fetchOperationLog();
+
+        // 页面加载后聚焦输入框
+        userInput.focus();
+    </script>
+</body>
+</html>
