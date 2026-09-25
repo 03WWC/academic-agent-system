@@ -14,10 +14,17 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
     volumes:
       - .:/app
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.deepseek.com}
+      - OPENAI_MODEL=${OPENAI_MODEL:-deepseek-v4-flash}
+      # 容器内通过服务名访问 Qdrant，localhost 指向容器自身
+      - QDRANT_URL=http://qdrant:6333
+      - SQLITE_DB_PATH=./customer_support_chat/data/academic.sqlite
     networks:
       - app-network
     depends_on:
