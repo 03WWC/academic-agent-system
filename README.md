@@ -2,11 +2,7 @@
 
 这是一个面向 AI Agent 岗位作品集的教务服务项目。项目基于 LangGraph 构建多 Agent 工作流，让主助手根据学生意图把问题分发给不同的教务专业助手，并通过工具查询真实数据库或政策文档。
 
-原始开源项目保留在旁边目录，方便对照学习：
-
-```text
-C:\Users\Administrator\Desktop\ai_study\agent_project_study\langgraph_multi-agent-rag-customer-support-proxy
-```
+项目参考了开源多 Agent 客服项目 `langgraph_multi-agent-rag-customer-support-proxy`，并在此基础上把业务流程重构为高校教务场景。
 
 ## 核心能力
 
