@@ -28,8 +28,11 @@ load_dotenv()
 
 app = FastAPI()
 
-# 挂载静态资源目录
-app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
+# 挂载静态资源目录。目录不存在时 StaticFiles 会直接抛 RuntimeError，
+# 而 Git 不跟踪空目录，所以这里主动创建一次，保证克隆仓库后也能正常启动。
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+os.makedirs(static_dir, exist_ok=True)
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # 配置 Jinja2 模板目录
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
