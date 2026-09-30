@@ -5,7 +5,7 @@
 
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
-from customer_support_chat.app.core.settings import get_settings
+from customer_support_chat.app.core.settings import PLACEHOLDER_API_KEY, get_settings
 from customer_support_chat.app.core.logger import logger
 
 # --- Agent 输出结构 ---
@@ -27,7 +27,7 @@ settings = get_settings()
 # 越狱检测护栏 Agent
 jailbreak_guardrail_agent = ChatOpenAI(
     model=settings.OPENAI_MODEL,
-    openai_api_key=settings.OPENAI_API_KEY,
+    openai_api_key=settings.OPENAI_API_KEY or PLACEHOLDER_API_KEY,
     openai_api_base=settings.OPENAI_BASE_URL if settings.OPENAI_BASE_URL else None,
     temperature=0,  # 安全检查使用确定性输出
     extra_body={"thinking": {"type": "disabled"}},
@@ -45,7 +45,7 @@ jailbreak_guardrail_agent_instructions = (
 # 业务相关性检测护栏 Agent
 relevance_guardrail_agent = ChatOpenAI(
     model=settings.OPENAI_MODEL,
-    openai_api_key=settings.OPENAI_API_KEY,
+    openai_api_key=settings.OPENAI_API_KEY or PLACEHOLDER_API_KEY,
     openai_api_base=settings.OPENAI_BASE_URL if settings.OPENAI_BASE_URL else None,
     temperature=0,  # 相关性检查使用确定性输出
     extra_body={"thinking": {"type": "disabled"}},

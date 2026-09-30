@@ -2,7 +2,7 @@ from typing import Optional
 from langchain_core.runnables import Runnable, RunnableConfig
 from customer_support_chat.app.core.state import State
 from pydantic import BaseModel
-from customer_support_chat.app.core.settings import get_settings
+from customer_support_chat.app.core.settings import PLACEHOLDER_API_KEY, get_settings
 from langchain_openai import ChatOpenAI
 from langchain_core.tools import tool
 
@@ -11,7 +11,7 @@ settings = get_settings()
 # 初始化共享语言模型，供各个 Assistant 复用
 llm = ChatOpenAI(
     model=settings.OPENAI_MODEL,
-    openai_api_key=settings.OPENAI_API_KEY,
+    openai_api_key=settings.OPENAI_API_KEY or PLACEHOLDER_API_KEY,
     openai_api_base=settings.OPENAI_BASE_URL if settings.OPENAI_BASE_URL else None,
     temperature=1,
     max_tokens=settings.MAX_TOKENS,  # 限制输出长度，控制调用成本
