@@ -12,7 +12,11 @@ import json
 # 把项目根目录加入路径，方便 Web 层调用核心 Agent 模块
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from customer_support_chat.app.services.chat_service import process_user_message, stream_user_message
+from customer_support_chat.app.services.chat_service import (
+    process_user_message,
+    set_operation_log_sink,
+    stream_user_message,
+)
 from .core.user_data_manager import (
     get_user_session, 
     update_user_chat_history, 
@@ -20,11 +24,15 @@ from .core.user_data_manager import (
     set_user_decision, 
     clear_pending_action, 
     clear_user_decision,
-    get_operation_log
+    get_operation_log,
+    add_operation_log,
 )
 
 # 加载 .env 环境变量
 load_dotenv()
+
+# 把操作日志写入能力注入核心服务：核心层不依赖 Web 层，由这里提供实现。
+set_operation_log_sink(add_operation_log)
 
 app = FastAPI()
 

@@ -3,9 +3,7 @@ Web 层调用 LangGraph 教务多 Agent 系统的聊天服务。
 这里保留同步返回和 NDJSON 流式返回两种接口，方便页面和调试脚本复用。
 """
 
-import os
-import sys
-from typing import Any, AsyncGenerator, Dict
+from typing import Any, AsyncGenerator, Callable, Dict, Optional
 
 from langchain_core.messages import AIMessage
 
@@ -13,20 +11,17 @@ from customer_support_chat.app.core.logger import logger
 from customer_support_chat.app.graph import multi_agentic_graph
 
 
-try:
-    # 命令行运行时也允许导入 Web 的本地会话日志模块。
-    project_root = os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    )
-    if project_root not in sys.path:
-        sys.path.append(project_root)
+# 操作日志写入器由调用方（如 Web 层）注入。
+# 核心层不反向依赖上层模块，避免 core -> web -> core 的循环依赖。
+_operation_log_sink: Optional[Callable[[str, Dict[str, Any]], None]] = None
 
-    from web_app.app.core.user_data_manager import add_operation_log
 
-    WEB_APP_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"Web 应用模块不可用，操作日志功能将受限。错误：{e}")
-    WEB_APP_AVAILABLE = False
+def set_operation_log_sink(
+    sink: Optional[Callable[[str, Dict[str, Any]], None]]
+) -> None:
+    """注册操作日志写入器；传入 None 表示关闭日志记录。"""
+    global _operation_log_sink
+    _operation_log_sink = sink
 
 
 ACADEMIC_ASSISTANT_NODES = {
@@ -44,9 +39,9 @@ def _to_langgraph_config(session_data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _add_log(session_id: str, entry: Dict[str, Any]) -> None:
-    """写入页面右侧操作日志；非 Web 环境下直接跳过。"""
-    if WEB_APP_AVAILABLE:
-        add_operation_log(session_id, entry)
+    """写入页面右侧操作日志；未注册写入器时直接跳过。"""
+    if _operation_log_sink is not None:
+        _operation_log_sink(session_id, entry)
 
 
 async def process_user_message(session_data: Dict[str, Any], user_message: str) -> str:
