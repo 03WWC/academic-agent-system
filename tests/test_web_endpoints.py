@@ -6,6 +6,7 @@ Web 层此前完全没有测试覆盖，而它是用户唯一直接接触的部�
 """
 
 import unittest
+import warnings
 
 from fastapi.testclient import TestClient
 
@@ -39,6 +40,25 @@ class WebEndpointsTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["operation_log"], [])
+
+    def test_index_page_does_not_use_deprecated_template_signature(self):
+        """Starlette 已废弃 TemplateResponse(name, context) 的旧签名。
+
+        只针对这一条告警断言，避免被第三方库的其他 DeprecationWarning 干扰。
+        """
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+
+        offenders = [
+            str(w.message)
+            for w in caught
+            if issubclass(w.category, DeprecationWarning)
+            and "first parameter" in str(w.message)
+        ]
+        self.assertEqual(offenders, [], f"主页仍在用废弃的模板签名：{offenders}")
 
 
 if __name__ == "__main__":

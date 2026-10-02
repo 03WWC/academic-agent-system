@@ -77,8 +77,9 @@ def get_session_data(request: Request):
 async def get_chat_page(request: Request, session_data: dict = Depends(get_session_data)):
     """返回聊天页面。"""
     # 写入会话 Cookie，让刷新页面后还能恢复当前会话
-    response = templates.TemplateResponse("chat.html", {
-        "request": request, 
+    # 使用 Starlette 新版签名（request 作为第一个参数），旧签名已废弃；
+    # request 由 Starlette 自动注入 context，无需再手动传入。
+    response = templates.TemplateResponse(request, "chat.html", {
         "session_id": session_data["session_id"],
         "chat_history": session_data["user_data"].get("chat_history", [])
     })
