@@ -24,15 +24,17 @@ def load_user_data(session_id: str) -> Dict[str, Any]:
         return {}
     
     try:
-        with open(user_file, "r") as f:
+        # 必须显式指定 UTF-8：否则会按系统默认编码读取，
+        # 在中文 Windows 上（GBK）读取 UTF-8 文件会抛 UnicodeDecodeError。
+        with open(user_file, "r", encoding="utf-8") as f:
             return json.load(f)
-    except (json.JSONDecodeError, FileNotFoundError):
+    except (json.JSONDecodeError, UnicodeDecodeError, FileNotFoundError):
         return {}
 
 def save_user_data(session_id: str, data: Dict[str, Any]):
     """将用户数据保存到单独的 JSON 文件。"""
     user_file = get_user_data_file(session_id)
-    with open(user_file, "w") as f:
+    with open(user_file, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
 def get_user_session(session_id: str) -> Dict[str, Any]:

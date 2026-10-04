@@ -55,6 +55,33 @@ class UserDataManagerTest(unittest.TestCase):
     def test_load_user_data_returns_empty_dict_when_missing(self):
         self.assertEqual(user_data_manager.load_user_data("不存在"), {})
 
+    def test_load_user_data_survives_utf8_file_with_chinese(self):
+        """会话文件按 UTF-8 读写。
+
+        之前 open() 未指定编码，在中文 Windows 上会按 GBK 解码 UTF-8 文件，
+        抛出的 UnicodeDecodeError 又不在 except 列表里，会直接冒泡出去。
+        """
+        self._session_file("utf8").write_text(
+            '{"session_id": "utf8", "chat_history": []}', encoding="utf-8"
+        )
+
+        self.assertEqual(
+            user_data_manager.load_user_data("utf8")["session_id"], "utf8"
+        )
+
+    def test_load_user_data_survives_corrupt_file(self):
+        self._session_file("broken").write_text("这不是 JSON", encoding="utf-8")
+
+        self.assertEqual(user_data_manager.load_user_data("broken"), {})
+
+    def test_saved_session_keeps_chinese_unmangled(self):
+        user_data_manager.update_user_chat_history("s-1", "补考什么时候截止", "开学后两周内")
+
+        history = user_data_manager.load_user_data("s-1")["chat_history"][-1]
+
+        self.assertEqual(history["user_message"], "补考什么时候截止")
+        self.assertEqual(history["ai_response"], "开学后两周内")
+
     # --- 聊天历史 ---
 
     def test_update_user_chat_history_appends_entries(self):
