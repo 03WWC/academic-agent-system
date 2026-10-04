@@ -33,6 +33,9 @@ def load_user_data(session_id: str) -> Dict[str, Any]:
 
 def save_user_data(session_id: str, data: Dict[str, Any]):
     """将用户数据保存到单独的 JSON 文件。"""
+    # 写入前确保目录存在：save_user_data 是公开入口，
+    # 不应依赖调用方先经过 load_user_data 才把目录建出来。
+    initialize_user_data_dir()
     user_file = get_user_data_file(session_id)
     with open(user_file, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)

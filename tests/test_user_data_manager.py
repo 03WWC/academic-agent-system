@@ -74,6 +74,15 @@ class UserDataManagerTest(unittest.TestCase):
 
         self.assertEqual(user_data_manager.load_user_data("broken"), {})
 
+    def test_save_user_data_creates_directory_when_missing(self):
+        """save_user_data 是公开写入入口，不应依赖调用方先建目录。"""
+        nested = Path(self._tmp.name) / "nested" / "user_data"
+        user_data_manager.USER_DATA_DIR = str(nested)
+
+        user_data_manager.save_user_data("s-1", {"session_id": "s-1"})
+
+        self.assertTrue((nested / "s-1.json").exists())
+
     def test_saved_session_keeps_chinese_unmangled(self):
         user_data_manager.update_user_chat_history("s-1", "补考什么时候截止", "开学后两周内")
 
