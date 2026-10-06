@@ -32,7 +32,9 @@ def lookup_academic_policy(query: str, limit: int = 2) -> str:
         content = path.read_text(encoding="utf-8")
         ranked_documents.append((_score_document(query, content), path.name, content))
 
-    ranked_documents.sort(key=lambda item: item[0], reverse=True)
+    # 分数相同时按文件名排序：否则排名会取决于 glob 的枚举顺序，
+    # 同一问题在不同文件系统上可能得到不同文档。
+    ranked_documents.sort(key=lambda item: (-item[0], item[1]))
     matched_documents = [item for item in ranked_documents if item[0] > 0][:limit]
     if not matched_documents:
         return "没有检索到相关教务政策，请补充更具体的问题。"
