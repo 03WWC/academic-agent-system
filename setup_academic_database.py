@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 
@@ -10,7 +11,8 @@ def initialize_academic_database(db_path: str | Path = DEFAULT_DB_PATH) -> Path:
     db_path = Path(db_path)
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with sqlite3.connect(db_path) as conn:
+    # 必须用 closing：sqlite3 的 with 只负责提交/回滚事务，并不会关闭连接。
+    with closing(sqlite3.connect(db_path)) as conn:
         cursor = conn.cursor()
 
         # 学生基础档案：Agent 用它回答“我是谁、什么专业、学籍是否正常”。

@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 from langchain_core.tools import tool
@@ -14,7 +15,9 @@ def analyze_academic_warning(student_id: str, db_path: str = str(DEFAULT_DB_PATH
     if not db_file.exists():
         return f"未找到教务数据库：{db_file}"
 
-    with sqlite3.connect(db_file) as conn:
+    # 必须用 closing：sqlite3 的 with 只负责提交/回滚事务，并不会关闭连接，
+    # 漏掉会让文件句柄一直挂着（Windows 下连数据库文件都删不掉）。
+    with closing(sqlite3.connect(db_file)) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 

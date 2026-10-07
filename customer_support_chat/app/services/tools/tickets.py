@@ -1,5 +1,6 @@
 import sqlite3
 import uuid
+from contextlib import closing
 from pathlib import Path
 
 from langchain_core.tools import tool
@@ -21,7 +22,9 @@ def create_academic_ticket(
         return f"未找到教务数据库：{db_file}"
 
     ticket_id = f"T-{uuid.uuid4().hex[:8].upper()}"
-    with sqlite3.connect(db_file) as conn:
+    # 必须用 closing：sqlite3 的 with 只负责提交/回滚事务，并不会关闭连接，
+    # 漏掉会让文件句柄一直挂着（Windows 下连数据库文件都删不掉）。
+    with closing(sqlite3.connect(db_file)) as conn:
         cursor = conn.cursor()
 
         # 创建工单前先校验学生存在，避免产生无主申请。
@@ -49,7 +52,9 @@ def search_academic_tickets(student_id: str, db_path: str = str(DEFAULT_DB_PATH)
     if not db_file.exists():
         return f"未找到教务数据库：{db_file}"
 
-    with sqlite3.connect(db_file) as conn:
+    # 必须用 closing：sqlite3 的 with 只负责提交/回滚事务，并不会关闭连接，
+    # 漏掉会让文件句柄一直挂着（Windows 下连数据库文件都删不掉）。
+    with closing(sqlite3.connect(db_file)) as conn:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute(
