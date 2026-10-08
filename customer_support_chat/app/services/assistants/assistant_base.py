@@ -18,23 +18,44 @@ llm = ChatOpenAI(
     extra_body={"thinking": {"type": "disabled"}},
 )
 
+def _is_empty_reply(result) -> bool:
+    """判断模型回复是否既没有工具调用、也没有可读文本。"""
+    if result.tool_calls:
+        return False
+
+    content = result.content
+    if not content:
+        return True
+
+    if isinstance(content, list):
+        first = content[0] if content else None
+        return not (isinstance(first, dict) and first.get("text"))
+
+    return False
+
+
 class Assistant:
+    # 一次正常询问 + 最多再补问两次。
+    # 原实现是 while True 且没有计数器：模型持续返回空内容时会无限循环，
+    # 请求永不返回、工作线程被占死，而且每一次循环都是一次真实的大模型调用。
+    MAX_ATTEMPTS = 3
+
     def __init__(self, runnable: Runnable):
         self.runnable = runnable
 
     def __call__(self, state: State, config: Optional[RunnableConfig] = None):
-        while True:
+        result = None
+
+        for _ in range(self.MAX_ATTEMPTS):
             result = self.runnable.invoke(state, config)
 
-            if not result.tool_calls and (
-                not result.content
-                or isinstance(result.content, list)
-                and not result.content[0].get("text")
-            ):
-                messages = state["messages"] + [("user", "请给出真实、可读的中文回复。")]
-                state = {**state, "messages": messages}
-            else:
+            if not _is_empty_reply(result):
                 break
+
+            messages = state["messages"] + [("user", "请给出真实、可读的中文回复。")]
+            state = {**state, "messages": messages}
+
+        # 连续多次空回复时直接返回最后一次结果，不再继续追问。
         return {"messages": result}
 
 # 定义完成或升级任务的工具
