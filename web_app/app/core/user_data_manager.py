@@ -1,5 +1,6 @@
 import json
 import os
+import uuid
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
@@ -37,8 +38,20 @@ def save_user_data(session_id: str, data: Dict[str, Any]):
     # 不应依赖调用方先经过 load_user_data 才把目录建出来。
     initialize_user_data_dir()
     user_file = get_user_data_file(session_id)
-    with open(user_file, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+
+    # 先写临时文件、再原子替换。
+    # 直接 open(user_file, "w") 会立刻把原文件截断，一旦写入中途失败，
+    # 已保存的会话就会变成空文件；而 load_user_data 把无法解析的文件
+    # 当作「无数据」返回空字典 —— 用户的历史记录会被静默清空。
+    temp_file = f"{user_file}.{uuid.uuid4().hex}.tmp"
+    try:
+        with open(temp_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        os.replace(temp_file, user_file)
+    finally:
+        # 写入或替换失败时清掉临时文件，不留下垃圾。
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
 
 def _new_session(session_id: str) -> Dict[str, Any]:
     """构造一个新会话的默认数据结构。"""

@@ -10,6 +10,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from web_app.app.core import user_data_manager
 
@@ -167,6 +168,60 @@ class UserDataManagerTest(unittest.TestCase):
         raw = self._session_file("s-1").read_text(encoding="utf-8")
 
         self.assertEqual(json.loads(raw)["session_id"], "s-1")
+
+
+class AtomicSaveTest(unittest.TestCase):
+    """会话文件必须原子写入。
+
+    open(path, "w") 会立刻把原文件截断：写入中途失败就会留下空文件，
+    而 load_user_data 把无法解析的文件当成「无数据」返回空字典，
+    结果是用户的历史记录被静默清空。
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._original_dir = user_data_manager.USER_DATA_DIR
+        user_data_manager.USER_DATA_DIR = self._tmp.name
+
+    def tearDown(self):
+        user_data_manager.USER_DATA_DIR = self._original_dir
+        self._tmp.cleanup()
+
+    def _session_file(self, session_id: str) -> Path:
+        return Path(self._tmp.name) / f"{session_id}.json"
+
+    def _entries(self):
+        return sorted(path.name for path in Path(self._tmp.name).iterdir())
+
+    def test_failed_write_keeps_previous_session_intact(self):
+        user_data_manager.update_user_chat_history("s-1", "问题一", "回答一")
+        before = self._session_file("s-1").read_text(encoding="utf-8")
+
+        with mock.patch.object(
+            user_data_manager.json, "dump", side_effect=OSError("磁盘写入失败")
+        ):
+            with self.assertRaises(OSError):
+                user_data_manager.update_user_chat_history("s-1", "问题二", "回答二")
+
+        self.assertEqual(
+            self._session_file("s-1").read_text(encoding="utf-8"),
+            before,
+            "写入失败后原有会话数据被破坏",
+        )
+
+    def test_successful_write_leaves_no_temporary_files(self):
+        user_data_manager.update_user_chat_history("s-1", "问题", "回答")
+
+        self.assertEqual(self._entries(), ["s-1.json"])
+
+    def test_failed_write_leaves_no_temporary_files(self):
+        with mock.patch.object(
+            user_data_manager.json, "dump", side_effect=OSError("磁盘写入失败")
+        ):
+            with self.assertRaises(OSError):
+                user_data_manager.update_user_chat_history("s-1", "问题", "回答")
+
+        self.assertEqual(self._entries(), [], "写入失败后残留了临时文件")
 
 
 if __name__ == "__main__":
