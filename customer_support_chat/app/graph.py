@@ -1,6 +1,6 @@
 from typing import Literal
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
@@ -60,11 +60,18 @@ builder.add_node("fetch_user_info", user_info)
 
 
 def guardrail_check(state: State, config: RunnableConfig):
-    """检查用户输入是否安全、是否属于教务服务范围。"""
+    """检查用户输入是否安全、是否属于教务服务范围。
+
+    拦下输入时会把 guardrail_blocked 置为 True，由 route_after_guardrail
+    结束本轮，避免原始输入继续流向主助手。
+    """
     user_messages = [msg for msg in state["messages"] if isinstance(msg, HumanMessage)]
     if not user_messages:
         logger.warning("没有找到用户输入，跳过护栏检查。")
-        return {"messages": [HumanMessage(content="请先输入你的教务问题。")]}
+        return {
+            "messages": [AIMessage(content="请先输入你的教务问题。")],
+            "guardrail_blocked": True,
+        }
 
     user_input = user_messages[-1].content
     logger.info(f"开始检查用户输入：{user_input}")
@@ -75,9 +82,11 @@ def guardrail_check(state: State, config: RunnableConfig):
     if not jailbreak_result.is_safe:
         logger.warning(f"发现不安全输入：{jailbreak_result.reasoning}")
         return {
+            # 拒答是助手说的话，不能用 HumanMessage 冒充用户输入。
             "messages": [
-                HumanMessage(content=f"这个请求我不能协助处理。原因：{jailbreak_result.reasoning}")
-            ]
+                AIMessage(content=f"这个请求我不能协助处理。原因：{jailbreak_result.reasoning}")
+            ],
+            "guardrail_blocked": True,
         }
 
     # 第二道护栏：检查是否与教务、课程、学生服务等主题相关。
@@ -87,10 +96,22 @@ def guardrail_check(state: State, config: RunnableConfig):
         logger.warning(f"输入可能不属于教务范围：{relevance_result.reasoning}")
 
     logger.info("用户输入通过护栏检查。")
-    return {"messages": []}
+    return {"messages": [], "guardrail_blocked": False}
 
 
 builder.add_node("guardrail_check", guardrail_check)
+
+
+def route_after_guardrail(state: State) -> str:
+    """护栏拦下输入时结束本轮，只有放行才进入主助手。
+
+    这里原本是一条无条件边 guardrail_check -> primary_assistant：
+    越狱输入被“拦下”后照样交给主助手，而原始越狱文本仍在上下文里，
+    主助手很可能照着它回答，护栏等于没有生效。
+    """
+    if state.get("guardrail_blocked"):
+        return END
+    return "primary_assistant"
 
 
 def should_route_to_primary(state: State) -> bool:
@@ -229,10 +250,14 @@ builder.add_conditional_edges(
 builder.add_edge("primary_assistant_tools", "primary_assistant")
 
 
-# 基础入口：每轮先补学生上下文，再过护栏，再进入主助手。
+# 基础入口：每轮先补学生上下文，再过护栏；护栏放行才进入主助手，拦下则直接结束。
 builder.add_edge(START, "fetch_user_info")
 builder.add_edge("fetch_user_info", "guardrail_check")
-builder.add_edge("guardrail_check", "primary_assistant")
+builder.add_conditional_edges(
+    "guardrail_check",
+    route_after_guardrail,
+    {END: END, "primary_assistant": "primary_assistant"},
+)
 
 
 memory = MemorySaver()

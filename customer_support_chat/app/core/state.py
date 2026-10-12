@@ -13,6 +13,9 @@ def update_dialog_stack(left: list[str], right: Optional[str]) -> list[str]:
 class State(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages]
     user_info: str
+    # 护栏是否拦下了本轮输入。每次经过 guardrail_check 都会被重新写入，
+    # 避免使用 checkpointer 时把上一轮的拦截结果带到下一轮。
+    guardrail_blocked: bool
     dialog_state: Annotated[
         list[
             Literal[
