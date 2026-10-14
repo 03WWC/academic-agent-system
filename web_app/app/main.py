@@ -18,12 +18,9 @@ from customer_support_chat.app.services.chat_service import (
     stream_user_message,
 )
 from .core.user_data_manager import (
-    get_user_session, 
-    update_user_chat_history, 
-    get_pending_action, 
-    set_user_decision, 
-    clear_pending_action, 
-    clear_user_decision,
+    get_user_session,
+    update_user_chat_history,
+    get_pending_action,
     get_operation_log,
     add_operation_log,
 )
