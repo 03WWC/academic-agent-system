@@ -14,7 +14,28 @@ import re
 import unittest
 from unittest import mock
 
+from customer_support_chat.app.graph import (
+    academic_warning_tools,
+    course_policy_tools,
+    primary_assistant_tools,
+    student_profile_tools,
+    ticket_tools,
+)
+
 TIME_PATTERN = re.compile(r"当前时间：([^。]+)。")
+
+
+def _tool_names(tools):
+    return {getattr(tool, "name", None) or tool.__name__ for tool in tools}
+
+
+BOUND_TOOLS = {
+    "primary_assistant": _tool_names(primary_assistant_tools),
+    "student_profile": _tool_names(student_profile_tools),
+    "course_policy": _tool_names(course_policy_tools),
+    "academic_warning": _tool_names(academic_warning_tools),
+    "ticket": _tool_names(ticket_tools),
+}
 
 # 助手名 -> (模块完整路径, 提示词属性名)
 ASSISTANT_PROMPTS = {
@@ -99,6 +120,44 @@ class AssistantPromptTest(unittest.TestCase):
 
                 self.assertEqual(first, "第一次读取")
                 self.assertEqual(second, "第二次读取")
+
+
+class PromptToolConsistencyTest(unittest.TestCase):
+    """提示词与工具绑定必须双向一致。
+
+    提示词写着「必须调用 xxx 工具」却没有绑定，模型就会去调一个不存在的工具；
+    反过来，绑定了却从没在提示词里提过，模型也不知道该用它。
+    这两种不一致靠人眼 review 很容易漏。
+    """
+
+    def _prompts(self):
+        for name, (module_path, attribute) in ASSISTANT_PROMPTS.items():
+            module = importlib.import_module(module_path)
+            yield name, getattr(module, attribute)
+
+    def test_prompt_never_mentions_a_tool_that_is_not_bound(self):
+        every_tool = set().union(*BOUND_TOOLS.values())
+
+        for name, prompt in self._prompts():
+            text = _render(prompt)
+            mentioned = {tool for tool in every_tool if tool in text}
+
+            with self.subTest(prompt=name):
+                self.assertTrue(
+                    mentioned <= BOUND_TOOLS[name],
+                    f"{name} 的提示词提到了未绑定的工具："
+                    f"{sorted(mentioned - BOUND_TOOLS[name])}",
+                )
+
+    def test_every_bound_tool_is_mentioned_in_its_prompt(self):
+        for name, prompt in self._prompts():
+            text = _render(prompt)
+            unmentioned = {tool for tool in BOUND_TOOLS[name] if tool not in text}
+
+            with self.subTest(prompt=name):
+                self.assertEqual(
+                    unmentioned, set(), f"{name} 绑定了但提示词没提到的工具：{sorted(unmentioned)}"
+                )
 
 
 if __name__ == "__main__":
