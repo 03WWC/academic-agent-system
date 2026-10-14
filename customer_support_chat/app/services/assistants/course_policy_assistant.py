@@ -30,7 +30,8 @@ course_policy_prompt = ChatPromptTemplate.from_messages(
         ),
         ("placeholder", "{messages}"),
     ]
-).partial(time=datetime.now())
+# 传 callable：datetime.now() 只在导入时求值一次，长驻服务下时间会一直是启动时刻。
+).partial(time=lambda: datetime.now())
 
 
 course_policy_tools = [lookup_academic_policy, CompleteOrEscalate]

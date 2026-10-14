@@ -35,7 +35,9 @@ primary_assistant_prompt = ChatPromptTemplate.from_messages(
         ),
         ("placeholder", "{messages}"),
     ]
-).partial(time=datetime.now())
+    # 必须传 callable：直接写 datetime.now() 会在导入时求值一次并固定下来，
+    # 长驻服务运行几天后模型看到的仍然只是进程启动那一刻的时间。
+).partial(time=lambda: datetime.now())
 
 
 # 主助手只保留教务方向委派工具，避免运行时加载历史业务依赖。
