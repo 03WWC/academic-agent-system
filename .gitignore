@@ -1,5 +1,6 @@
 .env
-.venv/
+# 覆盖 .venv 以及为更新 poetry.lock 临时创建的 .venv-poetry 等环境目录
+.venv*/
 __pycache__/
 *.py[cod]
 *.pyo
