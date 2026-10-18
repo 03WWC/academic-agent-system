@@ -1,15 +1,6 @@
 version: '3.8'
 
 services:
-  qdrant:
-    image: qdrant/qdrant
-    ports:
-      - "6333:6333"
-    volumes:
-      - ./customer_support_chat/data/qdrant_storage:/qdrant/storage
-    networks:
-      - app-network
-
   customer-support-chat:
     build:
       context: .
@@ -22,13 +13,9 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.deepseek.com}
       - OPENAI_MODEL=${OPENAI_MODEL:-deepseek-v4-flash}
-      # 容器内通过服务名访问 Qdrant，localhost 指向容器自身
-      - QDRANT_URL=http://qdrant:6333
       - SQLITE_DB_PATH=./customer_support_chat/data/academic.sqlite
     networks:
       - app-network
-    depends_on:
-      - qdrant
 
 networks:
   app-network:

@@ -17,15 +17,10 @@ class Config:
     OPENAI_MODEL: str = environ.get("OPENAI_MODEL", "gpt-3.5-turbo")
     MAX_TOKENS: int = int(environ.get("MAX_TOKENS", "1000"))  # 限制输出长度，控制调用成本
     
-    DATA_PATH: str = "./customer_support_chat/data"
     LOG_LEVEL: str = environ.get("LOG_LEVEL", "DEBUG")
     SQLITE_DB_PATH: str = environ.get(
         "SQLITE_DB_PATH", "./customer_support_chat/data/academic.sqlite"
     )
-    QDRANT_URL: str = environ.get("QDRANT_URL", "http://localhost:6333")
-    QDRANT_KEY: str = environ.get("QDRANT_KEY", "")
-    RECREATE_COLLECTIONS: bool = environ.get("RECREATE_COLLECTIONS", "False")
-    LIMIT_ROWS: int = environ.get("LIMIT_ROWS", "100")
     
 
 def get_settings():
