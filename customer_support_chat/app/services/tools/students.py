@@ -4,10 +4,12 @@ from pathlib import Path
 
 from langchain_core.tools import tool
 
+from customer_support_chat.app.core.settings import get_settings
 
-DEFAULT_DB_PATH = (
-    Path(__file__).parents[3] / "data" / "academic.sqlite"
-)
+
+# 数据库路径统一由 settings.SQLITE_DB_PATH 提供（同名环境变量可覆盖），
+# 未设置时回落到包内的 data/academic.sqlite。
+DEFAULT_DB_PATH = Path(get_settings().SQLITE_DB_PATH).expanduser()
 
 
 @tool
